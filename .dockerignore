@@ -1,0 +1,9 @@
+.git
+.worktrees
+node_modules
+**/node_modules
+apps/lab-console/dist
+.superpowers
+coverage
+playwright-report
+test-results

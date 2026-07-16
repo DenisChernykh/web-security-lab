@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+
+const gatewayPort = process.env.LAB_GATEWAY_HOST_PORT ?? "8080";
+const gatewayUrl = `http://127.0.0.1:${gatewayPort}`;
+
+const health = await fetch(`${gatewayUrl}/api/sql/health`).then((response) => response.json());
+assert.deepEqual(health, { status: "ok", labId: "sql" });
+
+const root = await fetch(`${gatewayUrl}/`);
+assert.equal(root.status, 200);
+assert.match(await root.text(), /LOCAL\/LAB/);

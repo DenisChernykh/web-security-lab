@@ -1,6 +1,6 @@
 import { createSqlLab } from "./app.js";
 
-const lab = createSqlLab();
+const lab = createSqlLab({ databasePath: process.env.DATABASE_PATH ?? ":memory:" });
 
 async function close(): Promise<void> {
   await lab.close();
