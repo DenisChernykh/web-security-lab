@@ -106,6 +106,11 @@ export function createCsrfLab({ attackerPort = 8081 }: CreateCsrfLabOptions = {}
     return { csrfToken: database.session().csrfToken };
   });
 
+  app.get("/exercise/attacker-origin", async (request, reply) => {
+    if (!hasNoQuery(request.query)) return reply.code(400).send({ error: "attacker origin query parameters are not allowed" });
+    return { origin: attackerOrigin };
+  });
+
   app.post("/exercise/email", async (request, reply) => {
     if (!hasNoQuery(request.query)) return reply.code(400).send({ error: "email query parameters are not allowed" });
     if (request.cookies[SESSION_COOKIE] !== SESSION_VALUE) return reply.code(401).send({ error: "session is required" });

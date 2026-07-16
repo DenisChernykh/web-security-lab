@@ -114,6 +114,9 @@ export const renderXss = async (traceId: string): Promise<string> => {
   return response.text();
 };
 
+export const getCsrfAttackerOrigin = (): Promise<{ origin: string }> =>
+  requestJson("csrf", "/exercise/attacker-origin", { signal: timeoutSignal() });
+
 export function subscribeToEvents(
   labId: LabId,
   onEvent: (event: LabEvent) => void,
