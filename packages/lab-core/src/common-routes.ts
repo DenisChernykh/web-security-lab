@@ -7,7 +7,7 @@ export interface CommonRouteDeps {
   labId: LabId;
   mode: ModeStore;
   events: EventBus;
-  reset(): void | Promise<void>;
+  reset(): unknown | Promise<unknown>;
   readSource(): Promise<SourcePair>;
 }
 
@@ -38,9 +38,11 @@ export async function registerCommonRoutes(
     }
   });
 
+  app.get("/mode", async () => ({ mode: deps.mode.get() }));
+
   app.post("/reset", async () => {
-    await deps.reset();
-    return { reset: true };
+    const seed = await deps.reset();
+    return seed === undefined ? { reset: true } : { reset: true, seed };
   });
 
   app.get("/source", async (request, reply) => {

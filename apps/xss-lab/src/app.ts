@@ -55,8 +55,8 @@ const isRenderQuery = (value: unknown): value is { traceId: string } =>
   typeof value.traceId === "string" &&
   UUID_PATTERN.test(value.traceId);
 
-const renderDocument = (content: string): string => `<!doctype html>
-<html lang="en">
+const renderDocument = (content: string, traceId: string): string => `<!doctype html>
+<html lang="en" data-trace-id="${traceId}">
   <head><meta charset="utf-8"><title>Local XSS exercise</title></head>
   <body><main><h1>Stored comment preview</h1><ul>${content}</ul></main></body>
 </html>`;
@@ -74,7 +74,10 @@ export function createXssLab({ databasePath = ":memory:" }: CreateXssLabOptions 
     labId: "xss",
     mode,
     events: bus,
-    reset: () => database.reset(),
+    reset: () => {
+      database.reset();
+      return { comments: database.list().length };
+    },
     readSource: createSourceReader(
       "xss",
       new URL("./handlers/vulnerable.ts", import.meta.url),
@@ -137,7 +140,7 @@ export function createXssLab({ databasePath = ":memory:" }: CreateXssLabOptions 
     const traceMode: LabMode = traceEvents[0]!.mode;
     const comments = database.list();
     const rendered = traceMode === "vulnerable" ? vulnerableRender(comments) : safeRender(comments);
-    return reply.type("text/html; charset=utf-8").send(renderDocument(rendered));
+    return reply.type("text/html; charset=utf-8").send(renderDocument(rendered, request.query.traceId));
   });
 
   app.post("/exercise/browser-event", async (request, reply) => {

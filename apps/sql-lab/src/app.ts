@@ -56,7 +56,10 @@ export function createSqlLab({ databasePath = ":memory:" }: CreateSqlLabOptions 
     labId: "sql",
     mode,
     events: bus,
-    reset: () => database.reset(),
+    reset: () => {
+      database.reset();
+      return database.connection.prepare("SELECT COUNT(*) AS count FROM users").get();
+    },
     readSource: createSourceReader(
       "sql",
       new URL("./handlers/vulnerable.ts", import.meta.url),

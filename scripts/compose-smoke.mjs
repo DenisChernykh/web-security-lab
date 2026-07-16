@@ -31,7 +31,7 @@ assert.deepEqual(idorHealth, { status: "ok", labId: "idor" });
 
 const idorReset = await fetch(`${gatewayUrl}/api/idor/reset`, { method: "POST" });
 assert.equal(idorReset.status, 200);
-assert.deepEqual(await idorReset.json(), { reset: true });
+assert.equal((await idorReset.json()).reset, true);
 
 const csrfHealth = await fetch(`${gatewayUrl}/api/csrf/health`).then((response) => response.json());
 assert.deepEqual(csrfHealth, { status: "ok", labId: "csrf" });
@@ -42,7 +42,8 @@ assert.deepEqual(csrfAttackerHealth, { status: "ok", service: "csrf-attacker" })
 for (const lab of ["sql", "xss", "idor", "csrf"]) {
   const first = await fetch(`${gatewayUrl}/api/${lab}/reset`, { method: "POST" }).then((response) => response.json());
   const second = await fetch(`${gatewayUrl}/api/${lab}/reset`, { method: "POST" }).then((response) => response.json());
-  assert.deepEqual(second, first);
+  assert.equal(first.reset, true);
+  assert.deepEqual(second.seed, first.seed);
 }
 
 const root = await fetch(`${gatewayUrl}/`);

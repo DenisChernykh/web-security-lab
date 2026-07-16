@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Dispatch } from "react";
 import type { LabId, LabMode } from "@local-lab/contracts";
 import { redact } from "@local-lab/lab-core/redact";
 import type { Scenario } from "../content/scenarios.js";
 import {
   getHealth,
+  getMode,
   getSource,
   resetLab,
   runFixedExercise,
@@ -33,6 +34,8 @@ function isRunnable(status: ExperimentState["status"]): boolean {
 }
 
 export function ExperimentRunner({ labId, scenario, state, dispatch }: ExperimentRunnerProps) {
+  const [requestKind, setRequestKind] = useState<"normal" | "attack">("attack");
+  const [resetPending, setResetPending] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     const unsubscribe = subscribeToEvents(
@@ -41,9 +44,10 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
       () => dispatch({ type: "STREAM_INCOMPLETE" })
     );
 
-    void Promise.all([getHealth(labId, controller.signal), getSource(labId)])
-      .then(([, source]) => {
+    void Promise.all([getHealth(labId, controller.signal), getSource(labId), getMode(labId)])
+      .then(([, source, confirmedMode]) => {
         dispatch({ type: "SOURCE_LOADED", source });
+        dispatch({ type: "MODE_SYNCED", mode: confirmedMode.mode });
         dispatch({ type: "HEALTH_READY" });
       })
       .catch((error: unknown) => {
@@ -77,10 +81,26 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
     }
     dispatch({ type: "RUN_STARTED" });
     try {
-      const result = await runFixedExercise(labId, scenario.attackRequest);
+      const input = requestKind === "normal" ? scenario.normalRequest : scenario.attackRequest;
+      const result = await runFixedExercise(labId, input);
       dispatch({ type: "RUN_SUCCEEDED", result });
     } catch (error) {
-      dispatch({ type: "RUN_FAILED", error: error instanceof Error ? error.message : "Unknown error" });
+      const message = error instanceof DOMException && error.name === "TimeoutError"
+        ? "Превышено время ожидания 8 секунд"
+        : error instanceof Error ? error.message : "Unknown error";
+      dispatch({ type: "RUN_FAILED", error: message });
+    }
+  };
+
+  const reset = async () => {
+    setResetPending(true);
+    try {
+      await resetLab(labId);
+      dispatch({ type: "RESET_SUCCEEDED" });
+    } catch (error) {
+      dispatch({ type: "RESET_FAILED", error: error instanceof Error ? error.message : "Unknown error" });
+    } finally {
+      setResetPending(false);
     }
   };
 
@@ -112,24 +132,28 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
 
       <section className="request-preview" aria-labelledby="request-title">
         <h2 id="request-title">Фиксированный учебный запрос</h2>
-        <code>{JSON.stringify(redact(scenario.attackRequest))}</code>
+        <div className="request-kind" aria-label="Учебный запрос">
+          <button type="button" aria-pressed={requestKind === "normal"} onClick={() => setRequestKind("normal")}>Нормальный запрос</button>
+          <button type="button" aria-pressed={requestKind === "attack"} onClick={() => setRequestKind("attack")}>Локальная атака</button>
+        </div>
+        <code>{JSON.stringify(redact(requestKind === "normal" ? scenario.normalRequest : scenario.attackRequest))}</code>
         <p>Ввод нельзя изменить: этот урок выполняет только локальный пример.</p>
       </section>
 
       {state.mode === "safe" ? <p className="safe-principle">{scenario.safePrinciple}</p> : null}
 
-      <button
+      {labId === "csrf" ? null : <button
         className="run-button"
         type="button"
         onClick={() => void run()}
         disabled={!isRunnable(state.status) || state.modeChangePending !== undefined}
       >
         Запустить локально
-      </button>
-      <button className="reset-button" type="button" onClick={() => void resetLab(labId)}>Сбросить лабораторию</button>
+      </button>}
+      <button className="reset-button" type="button" disabled={resetPending || state.status === "running"} onClick={() => void reset()}>Сбросить лабораторию</button>
       {state.status === "running" ? <div className="request-progress" aria-label="Запрос выполняется" /> : null}
       {labId === "xss" && state.result !== undefined ? <XssPreview traceId={state.result.traceId} /> : null}
-      {labId === "csrf" ? <CsrfExercise /> : null}
+      {labId === "csrf" ? <CsrfExercise mode={state.mode} /> : null}
     </main>
   );
 }

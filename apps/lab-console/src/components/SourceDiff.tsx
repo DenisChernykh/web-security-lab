@@ -13,7 +13,10 @@ export function SourceDiff({ mode, source }: SourceDiffProps) {
   return (
     <div className="source-diff">
       <p>Активная реализация: <strong>{mode === "safe" ? "защищённая" : "уязвимая"}</strong></p>
-      <pre><code>{source[mode]}</code></pre>
+      <div className="source-pair">
+        <section><h3>Уязвимая</h3><pre><code>{source.vulnerable}</code></pre></section>
+        <section><h3>Защищённая</h3><pre><code>{source.safe}</code></pre></section>
+      </div>
     </div>
   );
 }

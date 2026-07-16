@@ -17,7 +17,7 @@ export const FIXED_EXERCISES = {
   },
   xss: {
     normal: "Отличный учебный пример",
-    attack: `<img src="x" alt="" onerror="parent.postMessage({type:'lab-xss',traceId:new URLSearchParams(location.search).get('traceId')},'*')">`
+    attack: `<img src="x" alt="" onerror="parent.postMessage({type:'lab-xss',traceId:document.documentElement.dataset.traceId},'*')">`
   },
   idor: { user: "alice", documents: ["doc-alice", "doc-bob"] },
   csrf: {

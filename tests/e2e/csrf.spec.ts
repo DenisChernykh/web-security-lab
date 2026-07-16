@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-const victim = "http://localhost:18080";
-const attacker = "http://localhost:18081";
+const victim = `http://localhost:${process.env.LAB_GATEWAY_HOST_PORT ?? "18080"}`;
+const attacker = `http://localhost:${process.env.LAB_ATTACKER_HOST_PORT ?? "18081"}`;
 
 async function victimCommand(page: import("@playwright/test").Page, path: string, init?: RequestInit) {
   await page.goto(victim);

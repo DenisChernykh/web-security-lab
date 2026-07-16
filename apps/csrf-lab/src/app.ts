@@ -73,7 +73,10 @@ export function createCsrfLab({ attackerPort = 8081 }: CreateCsrfLabOptions = {}
     labId: "csrf",
     mode,
     events: bus,
-    reset: () => database.reset(),
+    reset: () => {
+      database.reset();
+      return { profile: database.profile() };
+    },
     readSource: createSourceReader(
       "csrf",
       new URL("./handlers/vulnerable.ts", import.meta.url),

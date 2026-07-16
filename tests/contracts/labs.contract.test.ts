@@ -14,9 +14,12 @@ describe.each(labs)("%s shared HTTP contract", (labId, factory) => {
     try {
       expect((await lab.app.inject({ method: "GET", url: "/health" })).json()).toEqual({ status: "ok", labId });
       expect((await lab.app.inject({ method: "PUT", url: "/mode", payload: { mode: "safe" } })).json()).toEqual({ mode: "safe" });
+      expect((await lab.app.inject({ method: "GET", url: "/mode" })).json()).toEqual({ mode: "safe" });
       expect((await lab.app.inject({ method: "PUT", url: "/mode", payload: { mode: "custom" } })).statusCode).toBe(400);
-      expect((await lab.app.inject({ method: "POST", url: "/reset" })).json()).toEqual({ reset: true });
-      expect((await lab.app.inject({ method: "POST", url: "/reset" })).json()).toEqual({ reset: true });
+      const firstReset = (await lab.app.inject({ method: "POST", url: "/reset" })).json();
+      const secondReset = (await lab.app.inject({ method: "POST", url: "/reset" })).json();
+      expect(firstReset.reset).toBe(true);
+      expect(firstReset.seed).toEqual(secondReset.seed);
       const source = (await lab.app.inject({ method: "GET", url: "/source" })).json();
       expect(source.labId).toBe(labId);
       expect(source.vulnerable.length).toBeGreaterThan(20);

@@ -63,6 +63,9 @@ describe("SQL console", () => {
         return Response.json(sqlSource);
       }
       if (url.endsWith("/mode")) {
+        if (init?.method !== "PUT") {
+          return Response.json({ mode: "vulnerable" });
+        }
         modeRequests += 1;
         if (modeBehavior === "deferred") {
           return new Promise<Response>((resolve) => {

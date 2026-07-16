@@ -53,6 +53,9 @@ export async function setMode(labId: LabId, mode: LabMode): Promise<{ mode: LabM
   });
 }
 
+export const getMode = (labId: LabId): Promise<{ mode: LabMode }> =>
+  requestJson(labId, "/mode", { signal: timeoutSignal() });
+
 export async function resetLab(labId: LabId): Promise<void> {
   const response = await fetch(urlFor(labId, "/reset"), { method: "POST", signal: timeoutSignal() });
   if (!response.ok) {
@@ -92,14 +95,24 @@ export async function runFixedExercise(
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ user: "alice" }), credentials: "same-origin", signal: timeoutSignal()
     });
-    return requestJson(labId, "/exercise/documents/doc-bob", { credentials: "same-origin", signal: timeoutSignal() });
+    const documentId = body.documentId === "doc-alice" ? "doc-alice" : "doc-bob";
+    return requestExerciseResult(labId, `/exercise/documents/${documentId}`, { credentials: "same-origin", signal: timeoutSignal() });
   }
   await requestJson(labId, "/exercise/login", { method: "POST", credentials: "same-origin", signal: timeoutSignal() });
-  return requestJson(labId, "/exercise/email", {
+  return requestExerciseResult(labId, "/exercise/email", {
     method: "POST", credentials: "same-origin",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ email: String(body.email) }), signal: timeoutSignal()
   });
+}
+
+async function requestExerciseResult(labId: LabId, path: string, init: RequestInit): Promise<ExerciseResult> {
+  const response = await fetch(urlFor(labId, path), init);
+  const body: unknown = await response.json();
+  if (body !== null && typeof body === "object" && "outcome" in body && "traceId" in body) {
+    return body as ExerciseResult;
+  }
+  throw new Error(`Lab exercise failed with ${response.status}`);
 }
 
 export const acknowledgeXss = (traceId: string): Promise<{ acknowledged: true }> =>
@@ -116,6 +129,25 @@ export const renderXss = async (traceId: string): Promise<string> => {
 
 export const getCsrfAttackerOrigin = (): Promise<{ origin: string }> =>
   requestJson("csrf", "/exercise/attacker-origin", { signal: timeoutSignal() });
+
+export const csrfLogin = (): Promise<{ session: "accepted" }> => requestJson("csrf", "/exercise/login", {
+  method: "POST", credentials: "same-origin", signal: timeoutSignal()
+});
+
+export const getCsrfForm = (): Promise<{ csrfToken: string }> => requestJson("csrf", "/exercise/form", {
+  credentials: "same-origin", signal: timeoutSignal()
+});
+
+export const getCsrfProfile = (): Promise<{ profile: { email: string } }> => requestJson("csrf", "/exercise/profile", {
+  credentials: "same-origin", signal: timeoutSignal()
+});
+
+export const submitLegitimateCsrfChange = (email: string, csrfToken: string): Promise<ExerciseResult> =>
+  requestExerciseResult("csrf", "/exercise/email", {
+    method: "POST", credentials: "same-origin", signal: timeoutSignal(),
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ email, csrfToken })
+  });
 
 export function subscribeToEvents(
   labId: LabId,

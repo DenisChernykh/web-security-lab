@@ -47,7 +47,10 @@ export function createIdorLab({ databasePath = ":memory:" }: CreateIdorLabOption
     labId: "idor",
     mode,
     events: bus,
-    reset: () => database.reset(),
+    reset: () => {
+      database.reset();
+      return database.connection.prepare("SELECT COUNT(*) AS count FROM documents").get();
+    },
     readSource: createSourceReader(
       "idor",
       new URL("./handlers/vulnerable.ts", import.meta.url),

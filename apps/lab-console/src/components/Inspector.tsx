@@ -19,6 +19,10 @@ interface InspectorProps {
 export function Inspector({ state }: InspectorProps) {
   const [tab, setTab] = useState<InspectorTab>("response");
   const finalEvent = state.events.at(-1);
+  const selectAdjacent = (current: InspectorTab, direction: 1 | -1) => {
+    const index = tabs.findIndex(({ id }) => id === current);
+    setTab(tabs[(index + direction + tabs.length) % tabs.length]!.id);
+  };
 
   return (
     <aside className="inspector" aria-label="Инспектор эксперимента">
@@ -28,14 +32,21 @@ export function Inspector({ state }: InspectorProps) {
             type="button"
             role="tab"
             aria-selected={tab === id}
+            aria-controls={`panel-${id}`}
+            id={`tab-${id}`}
+            tabIndex={tab === id ? 0 : -1}
             key={id}
             onClick={() => setTab(id)}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowRight") selectAdjacent(id, 1);
+              if (event.key === "ArrowLeft") selectAdjacent(id, -1);
+            }}
           >
             {label}
           </button>
         ))}
       </div>
-      <div className="inspector-panel" key={tab} role="tabpanel">
+      <div className="inspector-panel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} key={tab} role="tabpanel">
         {tab === "response" ? (
           <><ResponsePanel state={state} />{finalEvent === undefined ? null : <p className="final-observation">{finalEvent.observation}</p>}</>
         ) : null}
@@ -46,6 +57,7 @@ export function Inspector({ state }: InspectorProps) {
                 <li className="log-entry" key={event.id}>
                   <time dateTime={event.timestamp}>{new Date(event.timestamp).toLocaleTimeString("ru-RU")}</time>
                   <strong>{event.source}</strong>
+                  <small>trace {event.traceId}</small>
                   <p>{event.observation}</p>
                   <p>{event.explanation}</p>
                   {event.result === undefined ? null : <small>{event.result}</small>}

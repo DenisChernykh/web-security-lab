@@ -17,6 +17,8 @@ export interface ExperimentState {
   source?: SourcePair | undefined;
   error?: string | undefined;
   modeChangePending?: LabMode | undefined;
+  comparison: Partial<Record<LabMode, ExerciseResult>>;
+  streamIncomplete: boolean;
 }
 
 export type ExperimentAction =
@@ -25,17 +27,20 @@ export type ExperimentAction =
   | { type: "SOURCE_LOADED"; source: SourcePair }
   | { type: "MODE_CHANGE_STARTED"; mode: LabMode }
   | { type: "MODE_CHANGED"; mode: LabMode }
+  | { type: "MODE_SYNCED"; mode: LabMode }
   | { type: "MODE_CHANGE_FAILED"; error: string }
   | { type: "RUN_STARTED" }
   | { type: "RUN_EVENT"; event: LabEvent }
   | { type: "RUN_SUCCEEDED"; result: ExerciseResult }
   | { type: "RUN_FAILED"; error: string }
-  | { type: "STREAM_INCOMPLETE" };
+  | { type: "STREAM_INCOMPLETE" }
+  | { type: "RESET_SUCCEEDED" }
+  | { type: "RESET_FAILED"; error: string };
 
 export const initialExperimentState: ExperimentState = {
   status: "checking",
   mode: "vulnerable",
-  events: []
+  events: [], comparison: {}, streamIncomplete: false
 };
 
 export function experimentReducer(state: ExperimentState, action: ExperimentAction): ExperimentState {
@@ -56,6 +61,8 @@ export function experimentReducer(state: ExperimentState, action: ExperimentActi
       return state.status !== "running" && state.modeChangePending !== undefined
         ? { ...state, mode: action.mode, modeChangePending: undefined, error: undefined }
         : state;
+    case "MODE_SYNCED":
+      return state.status === "checking" ? { ...state, mode: action.mode } : state;
     case "MODE_CHANGE_FAILED":
       return state.status !== "running" && state.modeChangePending !== undefined
         ? { ...state, modeChangePending: undefined, error: action.error }
@@ -75,8 +82,9 @@ export function experimentReducer(state: ExperimentState, action: ExperimentActi
     case "RUN_SUCCEEDED":
       return state.status === "running" ? {
         ...state,
-        status: "complete",
+        status: state.streamIncomplete ? "stream-incomplete" : "complete",
         result: action.result,
+        comparison: { ...state.comparison, [state.mode]: action.result },
         events: state.events.filter((event) => event.traceId === action.result.traceId)
       } : state;
     case "RUN_FAILED":
@@ -84,6 +92,11 @@ export function experimentReducer(state: ExperimentState, action: ExperimentActi
         ? { ...state, status: "exercise-error", error: action.error }
         : state;
     case "STREAM_INCOMPLETE":
-      return state.status === "complete" ? { ...state, status: "stream-incomplete" } : state;
+      return { ...state, streamIncomplete: true,
+        ...(state.status === "complete" ? { status: "stream-incomplete" as const } : {}) };
+    case "RESET_SUCCEEDED":
+      return { ...state, status: "ready", events: [], result: undefined, comparison: {}, error: undefined, streamIncomplete: false };
+    case "RESET_FAILED":
+      return { ...state, status: "infrastructure-error", error: action.error };
   }
 }
