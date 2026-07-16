@@ -9,7 +9,7 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["packages/**/*.test.ts", "apps/**/*.{test,spec}.ts", "tests/contracts/**/*.test.ts"],
+          include: ["packages/**/*.test.ts", "apps/**/*.{test,spec}.ts", "scripts/**/*.test.ts", "tests/contracts/**/*.test.ts"],
           exclude: ["apps/lab-console/**/*.test.tsx"]
         }
       },

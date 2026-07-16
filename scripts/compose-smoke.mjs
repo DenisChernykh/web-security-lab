@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 
-const gatewayPort = process.env.LAB_GATEWAY_HOST_PORT ?? "8080";
+function parseGatewayPort(value) {
+  const portValue = value ?? "8080";
+
+  if (!/^\d+$/.test(portValue)) {
+    throw new TypeError("LAB_GATEWAY_HOST_PORT must be an integer from 1 to 65535");
+  }
+
+  const port = Number(portValue);
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65535) {
+    throw new RangeError("LAB_GATEWAY_HOST_PORT must be an integer from 1 to 65535");
+  }
+
+  return port;
+}
+
+const gatewayPort = parseGatewayPort(process.env.LAB_GATEWAY_HOST_PORT);
 const gatewayUrl = `http://127.0.0.1:${gatewayPort}`;
 
 const health = await fetch(`${gatewayUrl}/api/sql/health`).then((response) => response.json());
