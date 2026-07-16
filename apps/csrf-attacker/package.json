@@ -1,0 +1,11 @@
+{
+  "name": "@local-lab/csrf-attacker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "fastify": "5.10.0"
+  }
+}

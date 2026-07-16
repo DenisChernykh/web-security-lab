@@ -1,0 +1,14 @@
+{
+  "name": "@local-lab/csrf-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@local-lab/contracts": "*",
+    "@local-lab/lab-core": "*",
+    "fastify": "5.10.0"
+  }
+}
