@@ -11,11 +11,15 @@ const createAttackerPage = (victimPort: number) => `<!doctype html>
     <main>
       <h1>Межсайтовая форма</h1>
       <p>Эта страница может отправить форму на сайт-жертву, но не может прочитать iframe: другой порт — другой origin.</p>
-      <form action="http://localhost:${victimPort}/api/csrf/exercise/email" method="post" target="csrf-result">
+      <form id="csrf-attack" data-victim-port="${victimPort}" method="post" target="csrf-result">
         <input type="hidden" name="email" value="attacker-controlled@example.test">
         <button type="submit">Отправить межсайтовый запрос</button>
       </form>
       <iframe name="csrf-result" title="Ответ сайта-жертвы"></iframe>
+      <script>
+        const form = document.getElementById("csrf-attack");
+        form.action = "http://" + location.hostname + ":" + form.dataset.victimPort + "/api/csrf/exercise/email";
+      </script>
     </main>
   </body>
 </html>`;

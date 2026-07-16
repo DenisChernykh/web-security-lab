@@ -33,8 +33,13 @@ function isRunnable(status: ExperimentState["status"]): boolean {
   return status === "ready" || status === "complete" || status === "stream-incomplete";
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof DOMException && error.name === "TimeoutError"
+    ? "Превышено время ожидания 8 секунд"
+    : error instanceof Error ? error.message : "Unknown error";
+}
+
 export function ExperimentRunner({ labId, scenario, state, dispatch }: ExperimentRunnerProps) {
-  const [requestKind, setRequestKind] = useState<"normal" | "attack">("attack");
   const [resetPending, setResetPending] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -52,7 +57,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
-          dispatch({ type: "INITIALIZATION_FAILED", error: error instanceof Error ? error.message : "Unknown error" });
+          dispatch({ type: "INITIALIZATION_FAILED", error: `${labId}-lab: ${errorMessage(error)}` });
         }
       });
 
@@ -81,14 +86,11 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
     }
     dispatch({ type: "RUN_STARTED" });
     try {
-      const input = requestKind === "normal" ? scenario.normalRequest : scenario.attackRequest;
+      const input = state.requestKind === "normal" ? scenario.normalRequest : scenario.attackRequest;
       const result = await runFixedExercise(labId, input);
       dispatch({ type: "RUN_SUCCEEDED", result });
     } catch (error) {
-      const message = error instanceof DOMException && error.name === "TimeoutError"
-        ? "Превышено время ожидания 8 секунд"
-        : error instanceof Error ? error.message : "Unknown error";
-      dispatch({ type: "RUN_FAILED", error: message });
+      dispatch({ type: "RUN_FAILED", error: errorMessage(error) });
     }
   };
 
@@ -133,10 +135,10 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
       <section className="request-preview" aria-labelledby="request-title">
         <h2 id="request-title">Фиксированный учебный запрос</h2>
         <div className="request-kind" aria-label="Учебный запрос">
-          <button type="button" aria-pressed={requestKind === "normal"} onClick={() => setRequestKind("normal")}>Нормальный запрос</button>
-          <button type="button" aria-pressed={requestKind === "attack"} onClick={() => setRequestKind("attack")}>Локальная атака</button>
+          <button type="button" disabled={!isRunnable(state.status)} aria-pressed={state.requestKind === "normal"} onClick={() => dispatch({ type: "REQUEST_KIND_CHANGED", requestKind: "normal" })}>Нормальный запрос</button>
+          <button type="button" disabled={!isRunnable(state.status)} aria-pressed={state.requestKind === "attack"} onClick={() => dispatch({ type: "REQUEST_KIND_CHANGED", requestKind: "attack" })}>Локальная атака</button>
         </div>
-        <code>{JSON.stringify(redact(requestKind === "normal" ? scenario.normalRequest : scenario.attackRequest))}</code>
+        <code>{JSON.stringify(redact(state.requestKind === "normal" ? scenario.normalRequest : scenario.attackRequest))}</code>
         <p>Ввод нельзя изменить: этот урок выполняет только локальный пример.</p>
       </section>
 
@@ -153,7 +155,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
       <button className="reset-button" type="button" disabled={resetPending || state.status === "running"} onClick={() => void reset()}>Сбросить лабораторию</button>
       {state.status === "running" ? <div className="request-progress" aria-label="Запрос выполняется" /> : null}
       {labId === "xss" && state.result !== undefined ? <XssPreview traceId={state.result.traceId} /> : null}
-      {labId === "csrf" ? <CsrfExercise mode={state.mode} /> : null}
+      {labId === "csrf" ? <CsrfExercise mode={state.mode} state={state} dispatch={dispatch} /> : null}
     </main>
   );
 }

@@ -69,4 +69,17 @@ describe("experimentReducer", () => {
       result: { traceId: "trace-1", outcome: "exploited", status: 200, body: {} }
     }).events).toEqual([matching]);
   });
+
+  it("never compares results from different fixed request kinds", () => {
+    const ready = experimentReducer(initialExperimentState, { type: "HEALTH_READY" });
+    const vulnerableAttack = experimentReducer(
+      experimentReducer(ready, { type: "RUN_STARTED" }),
+      { type: "RUN_SUCCEEDED", result: { traceId: "attack", outcome: "exploited", status: 200, body: {} } }
+    );
+    const normalSelected = experimentReducer(vulnerableAttack, { type: "REQUEST_KIND_CHANGED", requestKind: "normal" });
+
+    expect(normalSelected.requestKind).toBe("normal");
+    expect(normalSelected.comparison).toEqual({});
+    expect(normalSelected.result).toBeUndefined();
+  });
 });

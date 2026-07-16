@@ -12,7 +12,7 @@ export function ResponsePanel({ state }: { state: ExperimentState }) {
     <pre><code>{JSON.stringify(redact(state.result.body), null, 2)}</code></pre>
     {state.comparison.vulnerable !== undefined && state.comparison.safe !== undefined ? (
       <div className="result-comparison">
-        <p>Сравнение: уязвимый — <strong>{labels[state.comparison.vulnerable.outcome]}</strong></p>
+        <p>Сравнение одного {state.requestKind === "attack" ? "атакующего" : "нормального"} запроса: уязвимый — <strong>{labels[state.comparison.vulnerable.outcome]}</strong></p>
         <p>защищённый — <strong>{labels[state.comparison.safe.outcome]}</strong></p>
       </div>
     ) : null}

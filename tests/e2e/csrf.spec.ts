@@ -14,7 +14,8 @@ async function victimCommand(page: import("@playwright/test").Page, path: string
 async function submitAttackerForm(page: import("@playwright/test").Page) {
   await page.goto(attacker);
   await page.getByRole("button", { name: "Отправить межсайтовый запрос" }).click();
-  await expect.poll(() => page.frames().find((frame) => frame.name() === "csrf-result")?.url()).toContain("localhost:18080");
+  await expect.poll(() => page.frames().find((frame) => frame.name() === "csrf-result")?.url())
+    .toContain(`localhost:${process.env.LAB_GATEWAY_HOST_PORT ?? "18080"}`);
   expect(await page.locator("iframe").evaluate((frame) => {
     try { return Boolean((frame as HTMLIFrameElement).contentDocument?.body); } catch { return false; }
   })).toBe(false);
@@ -38,4 +39,48 @@ test("cross-origin form mutates vulnerable profile but synchronizer token blocks
   await submitAttackerForm(page);
   const blocked = await victimCommand(page, "/api/csrf/exercise/profile");
   expect(blocked.body.profile.email).not.toBe("attacker-controlled@example.test");
+});
+
+test("console completes normal, vulnerable and protected CSRF journeys", async ({ page, request }) => {
+  await request.post("/api/csrf/reset");
+  await request.put("/api/csrf/mode", { data: { mode: "vulnerable" } });
+  await page.goto("/");
+  await page.getByRole("button", { name: "CSRF" }).click();
+  await expect(page.getByText("Локальная лаборатория готова")).toBeVisible();
+
+  await page.getByRole("button", { name: "Отправить легитимную форму с токеном" }).click();
+  await expect(page.locator(".response-panel > p").filter({ hasText: "Результат:" }).getByText("Ожидаемый результат")).toBeVisible();
+
+  const popupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Открыть межсайтовую атаку" }).click();
+  const popup = await popupPromise;
+  await popup.waitForURL(new RegExp(`^http://127\\.0\\.0\\.1:${process.env.LAB_ATTACKER_HOST_PORT ?? "18081"}/`));
+  await popup.getByRole("button", { name: "Отправить межсайтовый запрос" }).click();
+  await expect.poll(() => popup.frames().find((frame) => frame.name() === "csrf-result")?.url()).toContain("127.0.0.1");
+  expect(await popup.locator("iframe").evaluate((frame) => {
+    try { return Boolean((frame as HTMLIFrameElement).contentDocument?.body); } catch { return false; }
+  })).toBe(false);
+
+  await page.getByRole("button", { name: "Проверить профиль после атаки" }).click();
+  await expect(page.locator(".csrf-surface > p").filter({ hasText: "Текущий email:" }).getByText("attacker-controlled@example.test", { exact: true })).toBeVisible();
+  await expect(page.locator(".response-panel > p").filter({ hasText: "Результат:" }).getByText("Атака сработала")).toBeVisible();
+  await page.getByRole("tab", { name: "Логи" }).click();
+  await expect(page.getByText("Браузер отправил запрос к локальному сайту-жертве.")).toBeVisible();
+  await expect(page.getByText("Сервер изменяет профиль без проверки synchronizer token.")).toBeVisible();
+  await popup.close();
+
+  await page.getByRole("button", { name: "Защищённая" }).click();
+  const safePopupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Открыть межсайтовую атаку" }).click();
+  const safePopup = await safePopupPromise;
+  await safePopup.waitForURL(new RegExp(`^http://127\\.0\\.0\\.1:${process.env.LAB_ATTACKER_HOST_PORT ?? "18081"}/`));
+  await safePopup.getByRole("button", { name: "Отправить межсайтовый запрос" }).click();
+  await expect.poll(() => safePopup.frames().find((frame) => frame.name() === "csrf-result")?.url()).toContain("127.0.0.1");
+  await page.getByRole("button", { name: "Проверить профиль после атаки" }).click();
+  await page.getByRole("tab", { name: "Ответ" }).click();
+  await expect(page.locator(".response-panel > p").filter({ hasText: "Результат:" }).getByText("Защита сработала")).toBeVisible();
+  await expect(page.locator(".response-panel")).toContainText('"changed": false');
+  await expect(page.getByText(/Сравнение одного атакующего запроса: уязвимый/)).toBeVisible();
+  await expect(page.locator(".csrf-surface > p").filter({ hasText: "Текущий email:" }).getByText("attacker-controlled@example.test", { exact: true })).toBeVisible();
+  await safePopup.close();
 });

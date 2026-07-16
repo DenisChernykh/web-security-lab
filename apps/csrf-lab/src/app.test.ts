@@ -38,7 +38,11 @@ async function submitEmailChange({
   return app.inject({
     method: "POST",
     url: "/exercise/email",
-    headers: { cookie, "content-type": "application/x-www-form-urlencoded" },
+    headers: {
+      cookie,
+      "content-type": "application/x-www-form-urlencoded",
+      ...(includeToken ? {} : { origin: "http://127.0.0.1:8081" })
+    },
     payload: body
   });
 }
@@ -82,6 +86,12 @@ describe("CSRF victim lab", () => {
     expect(events.find((event) => event.kind === "csrf.token-decision")?.data).toMatchObject({
       csrfToken: "[REDACTED]"
     });
+    if (!includeToken) {
+      expect(events.find((event) => event.kind === "browser.origin-observed")?.data).toEqual({ origin: "attacker" });
+    }
+    const cookie = await login(lab.app);
+    const profile = await lab.app.inject({ method: "GET", url: "/exercise/profile", headers: { cookie } });
+    expect(profile.json().lastResult.traceId).toBe(response.json().traceId);
   });
 
   it("rejects arbitrary email values and form fields without a trace", async () => {

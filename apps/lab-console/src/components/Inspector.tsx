@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { redact } from "@local-lab/lab-core/redact";
 import type { ExperimentState } from "../lib/experiment-reducer.js";
 import { SourceDiff } from "./SourceDiff.js";
@@ -18,10 +18,13 @@ interface InspectorProps {
 
 export function Inspector({ state }: InspectorProps) {
   const [tab, setTab] = useState<InspectorTab>("response");
+  const tabRefs = useRef<Partial<Record<InspectorTab, HTMLButtonElement | null>>>({});
   const finalEvent = state.events.at(-1);
   const selectAdjacent = (current: InspectorTab, direction: 1 | -1) => {
     const index = tabs.findIndex(({ id }) => id === current);
-    setTab(tabs[(index + direction + tabs.length) % tabs.length]!.id);
+    const next = tabs[(index + direction + tabs.length) % tabs.length]!.id;
+    setTab(next);
+    tabRefs.current[next]?.focus();
   };
 
   return (
@@ -35,11 +38,12 @@ export function Inspector({ state }: InspectorProps) {
             aria-controls={`panel-${id}`}
             id={`tab-${id}`}
             tabIndex={tab === id ? 0 : -1}
+            ref={(node) => { tabRefs.current[id] = node; }}
             key={id}
             onClick={() => setTab(id)}
             onKeyDown={(event) => {
-              if (event.key === "ArrowRight") selectAdjacent(id, 1);
-              if (event.key === "ArrowLeft") selectAdjacent(id, -1);
+              if (event.key === "ArrowRight") { event.preventDefault(); selectAdjacent(id, 1); }
+              if (event.key === "ArrowLeft") { event.preventDefault(); selectAdjacent(id, -1); }
             }}
           >
             {label}

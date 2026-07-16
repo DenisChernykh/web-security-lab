@@ -9,6 +9,8 @@ export type ExperimentStatus =
   | "exercise-error"
   | "stream-incomplete";
 
+export type RequestKind = "normal" | "attack";
+
 export interface ExperimentState {
   status: ExperimentStatus;
   mode: LabMode;
@@ -17,6 +19,7 @@ export interface ExperimentState {
   source?: SourcePair | undefined;
   error?: string | undefined;
   modeChangePending?: LabMode | undefined;
+  requestKind: RequestKind;
   comparison: Partial<Record<LabMode, ExerciseResult>>;
   streamIncomplete: boolean;
 }
@@ -29,6 +32,7 @@ export type ExperimentAction =
   | { type: "MODE_CHANGED"; mode: LabMode }
   | { type: "MODE_SYNCED"; mode: LabMode }
   | { type: "MODE_CHANGE_FAILED"; error: string }
+  | { type: "REQUEST_KIND_CHANGED"; requestKind: RequestKind }
   | { type: "RUN_STARTED" }
   | { type: "RUN_EVENT"; event: LabEvent }
   | { type: "RUN_SUCCEEDED"; result: ExerciseResult }
@@ -40,7 +44,7 @@ export type ExperimentAction =
 export const initialExperimentState: ExperimentState = {
   status: "checking",
   mode: "vulnerable",
-  events: [], comparison: {}, streamIncomplete: false
+  events: [], requestKind: "attack", comparison: {}, streamIncomplete: false
 };
 
 export function experimentReducer(state: ExperimentState, action: ExperimentAction): ExperimentState {
@@ -67,6 +71,18 @@ export function experimentReducer(state: ExperimentState, action: ExperimentActi
       return state.status !== "running" && state.modeChangePending !== undefined
         ? { ...state, modeChangePending: undefined, error: action.error }
         : state;
+    case "REQUEST_KIND_CHANGED":
+      if ((state.status !== "ready" && state.status !== "complete" && state.status !== "stream-incomplete") ||
+        state.requestKind === action.requestKind) return state;
+      return {
+        ...state,
+        requestKind: action.requestKind,
+        status: state.status === "complete" || state.status === "stream-incomplete" ? "ready" : state.status,
+        result: undefined,
+        comparison: {},
+        events: [],
+        error: undefined
+      };
     case "RUN_STARTED":
       return state.modeChangePending === undefined &&
         state.status !== "checking" &&

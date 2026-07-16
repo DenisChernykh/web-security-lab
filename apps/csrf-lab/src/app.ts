@@ -58,12 +58,25 @@ const parseEmailChange = (value: unknown): EmailChangeRequest | undefined => {
 const eventData = (value: Record<string, unknown>): Record<string, unknown> =>
   redact(value) as Record<string, unknown>;
 
+const isConfiguredAttackerOrigin = (value: string | undefined, attackerPort: number): boolean => {
+  if (value === undefined) return false;
+  try {
+    const origin = new URL(value);
+    const port = origin.port === "" ? 80 : Number(origin.port);
+    return origin.protocol === "http:" && port === attackerPort &&
+      (origin.hostname === "localhost" || origin.hostname === "127.0.0.1" || origin.hostname === "::1");
+  } catch {
+    return false;
+  }
+};
+
 export function createCsrfLab({ attackerPort = 8081 }: CreateCsrfLabOptions = {}) {
   const app = Fastify();
   const attackerOrigin = `http://localhost:${attackerPort}`;
   const bus = new EventBus();
   const mode = new ModeStore();
   const database = new CsrfLabDatabase();
+  let lastResult: ExerciseResult<{ profile: Readonly<CsrfProfile>; changed: boolean }> | undefined;
 
   void app.register(cookie);
   app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string" }, (_request, body, done) => {
@@ -75,6 +88,7 @@ export function createCsrfLab({ attackerPort = 8081 }: CreateCsrfLabOptions = {}
     events: bus,
     reset: () => {
       database.reset();
+      lastResult = undefined;
       return { profile: database.profile() };
     },
     readSource: createSourceReader(
@@ -100,7 +114,7 @@ export function createCsrfLab({ attackerPort = 8081 }: CreateCsrfLabOptions = {}
   app.get("/exercise/profile", async (request, reply) => {
     if (!hasNoQuery(request.query)) return reply.code(400).send({ error: "profile query parameters are not allowed" });
     if (request.cookies[SESSION_COOKIE] !== SESSION_VALUE) return reply.code(401).send({ error: "session is required" });
-    return { profile: database.profile() };
+    return { profile: database.profile(), lastResult };
   });
 
   app.get("/exercise/form", async (request, reply) => {
@@ -121,7 +135,7 @@ export function createCsrfLab({ attackerPort = 8081 }: CreateCsrfLabOptions = {}
     if (change === undefined) return reply.code(400).send({ error: "email change is not an allowed exercise" });
 
     const trace = createTrace("csrf", mode.get(), bus);
-    const origin = request.headers.origin === attackerOrigin ? "attacker" : "victim";
+    const origin = isConfiguredAttackerOrigin(request.headers.origin, attackerPort) ? "attacker" : "victim";
     trace.emit({
       stepId: "browser.origin-observed",
       source: "browser",
@@ -141,7 +155,8 @@ export function createCsrfLab({ attackerPort = 8081 }: CreateCsrfLabOptions = {}
     const accepted = trace.mode === "vulnerable"
       ? vulnerableChangeEmail(database.session().csrfToken, change.csrfToken)
       : safeChangeEmail(database.session().csrfToken, change.csrfToken);
-    const outcome: ExerciseOutcome = accepted ? (trace.mode === "vulnerable" ? "exploited" : "expected") : "blocked";
+    const isAttack = change.csrfToken === undefined && change.email === FIXED_EXERCISES.csrf.attackEmail;
+    const outcome: ExerciseOutcome = accepted ? (isAttack ? "exploited" : "expected") : "blocked";
     const tokenLesson = CSRF_LESSON.token[trace.mode];
     trace.emit({
       stepId: "csrf.token-decision",
@@ -170,6 +185,7 @@ export function createCsrfLab({ attackerPort = 8081 }: CreateCsrfLabOptions = {}
       status,
       body: { profile, changed: accepted }
     };
+    lastResult = result;
     return reply.code(status).send(result);
   });
 

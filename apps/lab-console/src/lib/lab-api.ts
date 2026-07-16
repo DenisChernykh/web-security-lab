@@ -15,6 +15,8 @@ const EXERCISE_PATHS: Record<LabId, readonly string[]> = {
 };
 
 const timeoutSignal = (): AbortSignal => AbortSignal.timeout(8_000);
+const finiteSignal = (signal?: AbortSignal): AbortSignal =>
+  signal === undefined ? timeoutSignal() : AbortSignal.any([signal, timeoutSignal()]);
 
 function urlFor(labId: LabId, path: string): string {
   return `${LAB_BASE_PATHS[labId]}${path}`;
@@ -42,7 +44,7 @@ export async function getHealth(
   labId: LabId,
   signal?: AbortSignal
 ): Promise<{ status: "ok"; labId: LabId }> {
-  return requestJson(labId, "/health", signal === undefined ? undefined : { signal });
+  return requestJson(labId, "/health", { signal: finiteSignal(signal) });
 }
 
 export async function setMode(labId: LabId, mode: LabMode): Promise<{ mode: LabMode }> {
@@ -138,7 +140,7 @@ export const getCsrfForm = (): Promise<{ csrfToken: string }> => requestJson("cs
   credentials: "same-origin", signal: timeoutSignal()
 });
 
-export const getCsrfProfile = (): Promise<{ profile: { email: string } }> => requestJson("csrf", "/exercise/profile", {
+export const getCsrfProfile = (): Promise<{ profile: { email: string }; lastResult?: ExerciseResult }> => requestJson("csrf", "/exercise/profile", {
   credentials: "same-origin", signal: timeoutSignal()
 });
 

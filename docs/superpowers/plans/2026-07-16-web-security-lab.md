@@ -714,7 +714,7 @@ server {
 }
 ```
 
-No regex proxy, resolver-based proxy, variable upstream or user-controlled destination is allowed.
+The final gateway may use Docker's fixed `127.0.0.11` resolver, a prefix-stripping rewrite and variables whose values are hard-coded service names (`sql-lab`, `xss-lab`, `idor-lab`, `csrf-lab`, `lab-console`, `csrf-attacker`). This keeps routes valid when Compose recreates a backend. User-controlled destinations, hostnames, schemes, ports or arbitrary proxy variables are not allowed.
 
 - [ ] **Step 5: Verify the one-command slice**
 
@@ -1040,7 +1040,7 @@ window.dispatchEvent(new MessageEvent("message", {
 expect(fetch).toHaveBeenCalledWith("/api/xss/exercise/browser-event", expect.objectContaining({ method: "POST" }));
 ```
 
-CSRF test asserts the attacker iframe uses the constant `http://localhost:8081/` and no user input controls it.
+CSRF test asserts the attacker surface uses the configured numeric attacker port on the console's current loopback hostname and no user input controls either destination.
 
 Run: `npx vitest run --project console apps/lab-console/src/lessons.test.tsx`
 

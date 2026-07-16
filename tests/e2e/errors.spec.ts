@@ -4,6 +4,7 @@ test("health failure is explicit", async ({ page }) => {
   await page.route("**/api/sql/health", (route) => route.abort());
   await page.goto("/");
   await expect(page.getByText("Локальная лаборатория недоступна")).toBeVisible();
+  await expect(page.getByText(/sql-lab:/)).toBeVisible();
 });
 
 test("HTTP result survives an incomplete event stream", async ({ page, request }) => {
@@ -25,4 +26,7 @@ test("narrow layout preserves nav, experiment and inspector order", async ({ pag
   await expect(page.locator(".experiment")).toBeVisible();
   await page.locator(".inspector").scrollIntoViewIfNeeded();
   await expect(page.locator(".inspector")).toBeVisible();
+  await page.getByRole("tab", { name: "Ответ" }).focus();
+  await page.getByRole("tab", { name: "Ответ" }).press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Логи" })).toBeFocused();
 });

@@ -50,6 +50,26 @@ const root = await fetch(`${gatewayUrl}/`);
 assert.equal(root.status, 200);
 assert.match(await root.text(), /LOCAL\/LAB/);
 
+const recreate = spawnSync("docker", ["compose", "up", "-d", "--no-deps", "--force-recreate", "sql-lab"], {
+  encoding: "utf8"
+});
+assert.equal(recreate.status, 0, recreate.stderr);
+const dnsDeadline = Date.now() + 20_000;
+let recreatedHealth;
+while (Date.now() < dnsDeadline) {
+  try {
+    const candidate = await fetch(`${gatewayUrl}/api/sql/health`).then((response) => response.json());
+    if (candidate.status === "ok" && candidate.labId === "sql") {
+      recreatedHealth = candidate;
+      break;
+    }
+  } catch {
+    // The backend can be briefly unavailable while Compose replaces it.
+  }
+  await new Promise((resolve) => setTimeout(resolve, 250));
+}
+assert.deepEqual(recreatedHealth, { status: "ok", labId: "sql" }, "gateway did not re-resolve recreated sql-lab");
+
 const compose = spawnSync("docker", ["compose", "ps", "--format", "json"], { encoding: "utf8" });
 assert.equal(compose.status, 0, compose.stderr);
 const output = compose.stdout.trim();

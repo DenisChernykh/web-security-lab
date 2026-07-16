@@ -198,7 +198,7 @@ describe("SQL console", () => {
       rejectHealthRequest?.(new Error("health unavailable"));
     });
 
-    await screen.findByText("health unavailable");
+    await screen.findByText("sql-lab: health unavailable");
     expect(runButton.disabled).toBe(true);
   });
 });
