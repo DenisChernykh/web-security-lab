@@ -39,6 +39,26 @@ services:
     networks:
       - labs
 
+  idor-lab:
+    build:
+      context: .
+      dockerfile: infra/lab-runtime.Dockerfile
+    command: npx tsx apps/idor-lab/src/index.ts
+    environment:
+      DATABASE_PATH: /data/idor.sqlite
+    volumes:
+      - idor-data:/data
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    networks:
+      - labs
+
   lab-console:
     build:
       context: .
@@ -64,6 +84,8 @@ services:
         condition: service_healthy
       xss-lab:
         condition: service_healthy
+      idor-lab:
+        condition: service_healthy
       lab-console:
         condition: service_healthy
     healthcheck:
@@ -83,3 +105,4 @@ networks:
 volumes:
   sql-data:
   xss-data:
+  idor-data:
