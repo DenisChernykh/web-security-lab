@@ -1,0 +1,13 @@
+{
+  "name": "@local-lab/sql-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@local-lab/contracts": "*",
+    "@local-lab/lab-core": "*",
+    "fastify": "5.10.0"
+  }
+}
