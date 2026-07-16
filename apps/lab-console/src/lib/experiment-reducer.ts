@@ -6,6 +6,7 @@ export type ExperimentStatus =
   | "running"
   | "complete"
   | "infrastructure-error"
+  | "exercise-error"
   | "stream-incomplete";
 
 export interface ExperimentState {
@@ -80,7 +81,7 @@ export function experimentReducer(state: ExperimentState, action: ExperimentActi
       } : state;
     case "RUN_FAILED":
       return state.status === "running"
-        ? { ...state, status: "infrastructure-error", error: action.error }
+        ? { ...state, status: "exercise-error", error: action.error }
         : state;
     case "STREAM_INCOMPLETE":
       return state.status === "complete" ? { ...state, status: "stream-incomplete" } : state;

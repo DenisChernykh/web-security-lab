@@ -9,10 +9,12 @@ const LAB_BASE_PATHS: Record<LabId, string> = {
 
 const EXERCISE_PATHS: Record<LabId, readonly string[]> = {
   sql: ["/exercise/login"],
-  xss: [],
-  idor: [],
-  csrf: []
+  xss: ["/exercise/comment", "/exercise/browser-event"],
+  idor: ["/exercise/session", "/exercise/documents/doc-bob"],
+  csrf: ["/exercise/login", "/exercise/email", "/exercise/form", "/exercise/profile"]
 };
+
+const timeoutSignal = (): AbortSignal => AbortSignal.timeout(8_000);
 
 function urlFor(labId: LabId, path: string): string {
   return `${LAB_BASE_PATHS[labId]}${path}`;
@@ -29,7 +31,7 @@ async function requestJson<TResult>(
   path: string,
   init?: RequestInit
 ): Promise<TResult> {
-  const response = await fetch(urlFor(labId, path), init);
+  const response = await fetch(urlFor(labId, path), { ...init, signal: init?.signal ?? timeoutSignal() });
   if (!response.ok) {
     throw new Error(`Lab request failed with ${response.status}`);
   }
@@ -47,19 +49,19 @@ export async function setMode(labId: LabId, mode: LabMode): Promise<{ mode: LabM
   return requestJson(labId, "/mode", {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ mode })
+    body: JSON.stringify({ mode }), signal: timeoutSignal()
   });
 }
 
 export async function resetLab(labId: LabId): Promise<void> {
-  const response = await fetch(urlFor(labId, "/reset"), { method: "POST" });
+  const response = await fetch(urlFor(labId, "/reset"), { method: "POST", signal: timeoutSignal() });
   if (!response.ok) {
     throw new Error(`Lab reset failed with ${response.status}`);
   }
 }
 
 export async function getSource(labId: LabId): Promise<SourcePair> {
-  return requestJson(labId, "/source");
+  return requestJson(labId, "/source", { signal: timeoutSignal() });
 }
 
 export async function runExercise<TBody extends object, TResult extends Record<string, unknown>>(
@@ -73,10 +75,44 @@ export async function runExercise<TBody extends object, TResult extends Record<s
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-    ...(signal === undefined ? {} : { signal })
+    signal: signal ?? timeoutSignal()
   });
   return response.json() as Promise<ExerciseResult<TResult>>;
 }
+
+export async function runFixedExercise(
+  labId: LabId,
+  body: Record<string, unknown>
+): Promise<ExerciseResult> {
+  if (labId === "sql" || labId === "xss") {
+    return runExercise(labId, labId === "sql" ? "/exercise/login" : "/exercise/comment", body);
+  }
+  if (labId === "idor") {
+    await requestJson(labId, "/exercise/session", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ user: "alice" }), credentials: "same-origin", signal: timeoutSignal()
+    });
+    return requestJson(labId, "/exercise/documents/doc-bob", { credentials: "same-origin", signal: timeoutSignal() });
+  }
+  await requestJson(labId, "/exercise/login", { method: "POST", credentials: "same-origin", signal: timeoutSignal() });
+  return requestJson(labId, "/exercise/email", {
+    method: "POST", credentials: "same-origin",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ email: String(body.email) }), signal: timeoutSignal()
+  });
+}
+
+export const acknowledgeXss = (traceId: string): Promise<{ acknowledged: true }> =>
+  requestJson("xss", "/exercise/browser-event", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ type: "lab-xss", traceId }), signal: timeoutSignal()
+  });
+
+export const renderXss = async (traceId: string): Promise<string> => {
+  const response = await fetch(`${LAB_BASE_PATHS.xss}/render?traceId=${encodeURIComponent(traceId)}`, { signal: timeoutSignal() });
+  if (!response.ok) throw new Error(`XSS render failed with ${response.status}`);
+  return response.text();
+};
 
 export function subscribeToEvents(
   labId: LabId,

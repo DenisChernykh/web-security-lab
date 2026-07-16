@@ -6,12 +6,15 @@ import type { Scenario } from "../content/scenarios.js";
 import {
   getHealth,
   getSource,
-  runExercise,
+  resetLab,
+  runFixedExercise,
   setMode,
   subscribeToEvents
 } from "../lib/lab-api.js";
 import type { ExperimentAction, ExperimentState } from "../lib/experiment-reducer.js";
 import { LabStatus } from "./LabStatus.js";
+import { XssPreview } from "./XssPreview.js";
+import { CsrfExercise } from "./CsrfExercise.js";
 
 interface ExperimentRunnerProps {
   labId: LabId;
@@ -74,7 +77,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
     }
     dispatch({ type: "RUN_STARTED" });
     try {
-      const result = await runExercise(labId, "/exercise/login", scenario.attackRequest);
+      const result = await runFixedExercise(labId, scenario.attackRequest);
       dispatch({ type: "RUN_SUCCEEDED", result });
     } catch (error) {
       dispatch({ type: "RUN_FAILED", error: error instanceof Error ? error.message : "Unknown error" });
@@ -87,6 +90,10 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
       <p className="eyebrow">Локальный урок</p>
       <h1>{scenario.title}</h1>
       <p className="summary">{scenario.summary}</p>
+      <div className="lesson-copy">
+        <p><strong>Что происходит:</strong> {scenario.whatHappens}</p>
+        <p><strong>Почему работает:</strong> {scenario.whyItWorks}</p>
+      </div>
 
       <div className="mode-switch" aria-label="Режим лаборатории">
         {(Object.keys(modeLabels) as LabMode[]).map((mode) => (
@@ -119,7 +126,10 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
       >
         Запустить локально
       </button>
+      <button className="reset-button" type="button" onClick={() => void resetLab(labId)}>Сбросить лабораторию</button>
       {state.status === "running" ? <div className="request-progress" aria-label="Запрос выполняется" /> : null}
+      {labId === "xss" && state.result !== undefined ? <XssPreview traceId={state.result.traceId} /> : null}
+      {labId === "csrf" ? <CsrfExercise /> : null}
     </main>
   );
 }

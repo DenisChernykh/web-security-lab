@@ -11,6 +11,7 @@ const statusText: Record<ExperimentStatus, string> = {
   running: "Выполняем фиксированный учебный запрос",
   complete: "Эксперимент завершён",
   "infrastructure-error": "Локальная лаборатория недоступна",
+  "exercise-error": "Учебный запрос завершился ошибкой",
   "stream-incomplete": "Ответ получен, поток логов прерван"
 };
 
