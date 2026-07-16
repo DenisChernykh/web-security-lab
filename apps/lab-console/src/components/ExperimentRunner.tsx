@@ -41,6 +41,7 @@ function errorMessage(error: unknown): string {
 
 export function ExperimentRunner({ labId, scenario, state, dispatch }: ExperimentRunnerProps) {
   const [resetPending, setResetPending] = useState(false);
+  const [csrfResetVersion, setCsrfResetVersion] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     const unsubscribe = subscribeToEvents(
@@ -99,6 +100,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
     try {
       await resetLab(labId);
       dispatch({ type: "RESET_SUCCEEDED" });
+      if (labId === "csrf") setCsrfResetVersion((version) => version + 1);
     } catch (error) {
       dispatch({ type: "RESET_FAILED", error: error instanceof Error ? error.message : "Unknown error" });
     } finally {
@@ -155,7 +157,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
       <button className="reset-button" type="button" disabled={resetPending || state.status === "running"} onClick={() => void reset()}>Сбросить лабораторию</button>
       {state.status === "running" ? <div className="request-progress" aria-label="Запрос выполняется" /> : null}
       {labId === "xss" && state.result !== undefined ? <XssPreview traceId={state.result.traceId} /> : null}
-      {labId === "csrf" ? <CsrfExercise mode={state.mode} state={state} dispatch={dispatch} /> : null}
+      {labId === "csrf" ? <CsrfExercise key={csrfResetVersion} mode={state.mode} state={state} dispatch={dispatch} /> : null}
     </main>
   );
 }

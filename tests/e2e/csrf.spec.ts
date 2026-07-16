@@ -83,4 +83,29 @@ test("console completes normal, vulnerable and protected CSRF journeys", async (
   await expect(page.getByText(/Сравнение одного атакующего запроса: уязвимый/)).toBeVisible();
   await expect(page.locator(".csrf-surface > p").filter({ hasText: "Текущий email:" }).getByText("attacker-controlled@example.test", { exact: true })).toBeVisible();
   await safePopup.close();
+
+  await page.getByRole("button", { name: "Сбросить лабораторию" }).click();
+  await expect(page.locator(".csrf-surface > p").filter({ hasText: "Текущий email:" })).toHaveCount(0);
+
+  const staleResultPopupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Открыть межсайтовую атаку" }).click();
+  const staleResultPopup = await staleResultPopupPromise;
+  await staleResultPopup.waitForURL(new RegExp(`^http://127\\.0\\.0\\.1:${process.env.LAB_ATTACKER_HOST_PORT ?? "18081"}/`));
+  await staleResultPopup.getByRole("button", { name: "Отправить межсайтовый запрос" }).click();
+  await expect.poll(() => staleResultPopup.frames().find((frame) => frame.name() === "csrf-result")?.url()).toContain("127.0.0.1");
+  await page.getByRole("button", { name: "Проверить профиль после атаки" }).click();
+  await expect(page.locator(".response-panel > p").filter({ hasText: "Результат:" }).getByText("Защита сработала")).toBeVisible();
+  await staleResultPopup.close();
+
+  await page.reload();
+  await page.getByRole("button", { name: "CSRF" }).click();
+  await expect(page.getByText("Локальная лаборатория готова")).toBeVisible();
+  const noSubmitPopupPromise = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Открыть межсайтовую атаку" }).click();
+  const noSubmitPopup = await noSubmitPopupPromise;
+  await noSubmitPopup.waitForURL(new RegExp(`^http://127\\.0\\.0\\.1:${process.env.LAB_ATTACKER_HOST_PORT ?? "18081"}/`));
+  await page.getByRole("button", { name: "Проверить профиль после атаки" }).click();
+  await expect(page.getByText("Сначала отправьте фиксированную форму в окне атакующего.")).toBeVisible();
+  await expect(page.locator(".response-panel")).toHaveCount(0);
+  await noSubmitPopup.close();
 });
