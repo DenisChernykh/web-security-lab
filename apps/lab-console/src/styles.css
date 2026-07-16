@@ -48,7 +48,7 @@ h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); }
 .inspector-tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); }
 .inspector-tabs button { border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); padding: 14px 6px; font-size: 12px; }
 .inspector-tabs button[aria-selected="true"] { color: var(--accent); background: var(--surface-raised); }
-.inspector-panel { min-height: 240px; padding: 18px; transition: opacity 160ms ease, transform 160ms ease; }
+.inspector-panel { min-height: 240px; padding: 18px; }
 .empty-state { color: var(--muted); font-size: 14px; line-height: 1.5; }
 .response-panel p { line-height: 1.5; }
 .response-panel pre, .source-diff pre, .log-entry pre { overflow: auto; border: 1px solid var(--line); background: var(--surface); padding: 10px; font-size: 12px; }
@@ -65,6 +65,8 @@ h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); }
   .scenario-nav ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: no-preference) {
+  .inspector-panel { animation: inspector-tab-in 160ms ease-out both; }
   .log-entry { animation: log-in 180ms ease-out both; }
+  @keyframes inspector-tab-in { from { opacity: 0; transform: translateY(4px); } }
   @keyframes log-in { from { opacity: 0; transform: translateY(6px); } }
 }

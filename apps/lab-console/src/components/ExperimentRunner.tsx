@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { Dispatch } from "react";
 import type { LabId, LabMode } from "@local-lab/contracts";
+import { redact } from "@local-lab/lab-core/redact";
 import type { Scenario } from "../content/scenarios.js";
 import {
   getHealth,
@@ -25,9 +26,6 @@ const modeLabels: Record<LabMode, string> = {
 };
 
 export function ExperimentRunner({ labId, scenario, state, dispatch }: ExperimentRunnerProps) {
-  const modeRef = useRef(state.mode);
-  modeRef.current = state.mode;
-
   useEffect(() => {
     const controller = new AbortController();
     const unsubscribe = subscribeToEvents(
@@ -53,17 +51,23 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
     };
   }, [dispatch, labId]);
 
-  const chooseMode = (mode: LabMode) => {
-    if (mode === modeRef.current) {
+  const chooseMode = async (mode: LabMode) => {
+    if (state.modeChangePending !== undefined || mode === state.mode) {
       return;
     }
-    dispatch({ type: "MODE_CHANGED", mode });
-    void setMode(labId, mode).catch((error: unknown) => {
-      dispatch({ type: "RUN_FAILED", error: error instanceof Error ? error.message : "Unknown error" });
-    });
+    dispatch({ type: "MODE_CHANGE_STARTED", mode });
+    try {
+      const confirmed = await setMode(labId, mode);
+      dispatch({ type: "MODE_CHANGED", mode: confirmed.mode });
+    } catch (error) {
+      dispatch({ type: "MODE_CHANGE_FAILED", error: error instanceof Error ? error.message : "Unknown error" });
+    }
   };
 
   const run = async () => {
+    if (state.modeChangePending !== undefined) {
+      return;
+    }
     dispatch({ type: "RUN_STARTED" });
     try {
       const result = await runExercise(labId, "/exercise/login", scenario.attackRequest);
@@ -86,8 +90,9 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
             className={`mode-button ${mode === "safe" ? "safe" : ""}`}
             type="button"
             aria-pressed={state.mode === mode}
+            disabled={state.modeChangePending !== undefined}
             key={mode}
-            onClick={() => chooseMode(mode)}
+            onClick={() => void chooseMode(mode)}
           >
             {modeLabels[mode]}
           </button>
@@ -96,13 +101,18 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
 
       <section className="request-preview" aria-labelledby="request-title">
         <h2 id="request-title">Фиксированный учебный запрос</h2>
-        <code>{JSON.stringify(scenario.attackRequest)}</code>
+        <code>{JSON.stringify(redact(scenario.attackRequest))}</code>
         <p>Ввод нельзя изменить: этот урок выполняет только локальный пример.</p>
       </section>
 
       {state.mode === "safe" ? <p className="safe-principle">{scenario.safePrinciple}</p> : null}
 
-      <button className="run-button" type="button" onClick={() => void run()} disabled={state.status === "running"}>
+      <button
+        className="run-button"
+        type="button"
+        onClick={() => void run()}
+        disabled={state.status === "running" || state.modeChangePending !== undefined}
+      >
         Запустить локально
       </button>
       {state.status === "running" ? <div className="request-progress" aria-label="Запрос выполняется" /> : null}

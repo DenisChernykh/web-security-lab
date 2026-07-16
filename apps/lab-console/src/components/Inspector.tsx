@@ -34,13 +34,13 @@ export function Inspector({ state }: InspectorProps) {
           </button>
         ))}
       </div>
-      <div className="inspector-panel" role="tabpanel">
+      <div className="inspector-panel" key={tab} role="tabpanel">
         {tab === "response" ? (
           state.result === undefined ? <p className="empty-state">Запустите фиксированный пример, чтобы увидеть ответ.</p> : (
             <div className="response-panel">
               <p>Результат: <strong>{state.result.outcome}</strong></p>
               <p>HTTP: {state.result.status}</p>
-              <pre><code>{JSON.stringify(state.result.body, null, 2)}</code></pre>
+              <pre><code>{JSON.stringify(redact(state.result.body), null, 2)}</code></pre>
               {finalEvent === undefined ? null : <p className="final-observation">{finalEvent.observation}</p>}
             </div>
           )
