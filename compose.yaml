@@ -19,6 +19,26 @@ services:
     networks:
       - labs
 
+  xss-lab:
+    build:
+      context: .
+      dockerfile: infra/lab-runtime.Dockerfile
+    command: npx tsx apps/xss-lab/src/index.ts
+    environment:
+      DATABASE_PATH: /data/xss.sqlite
+    volumes:
+      - xss-data:/data
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    networks:
+      - labs
+
   lab-console:
     build:
       context: .
@@ -42,6 +62,8 @@ services:
     depends_on:
       sql-lab:
         condition: service_healthy
+      xss-lab:
+        condition: service_healthy
       lab-console:
         condition: service_healthy
     healthcheck:
@@ -60,3 +82,4 @@ networks:
 
 volumes:
   sql-data:
+  xss-data:

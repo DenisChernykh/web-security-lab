@@ -6,6 +6,9 @@ const gatewayUrl = `http://127.0.0.1:${gatewayPort}`;
 const health = await fetch(`${gatewayUrl}/api/sql/health`).then((response) => response.json());
 assert.deepEqual(health, { status: "ok", labId: "sql" });
 
+const xssHealth = await fetch(`${gatewayUrl}/api/xss/health`).then((response) => response.json());
+assert.deepEqual(xssHealth, { status: "ok", labId: "xss" });
+
 const root = await fetch(`${gatewayUrl}/`);
 assert.equal(root.status, 200);
 assert.match(await root.text(), /LOCAL\/LAB/);
