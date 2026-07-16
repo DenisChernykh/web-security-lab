@@ -18,7 +18,7 @@ export function CsrfExercise({ mode, state, dispatch }: CsrfExerciseProps) {
   const [attackerOrigin, setAttackerOrigin] = useState<string>();
   const [profile, setProfile] = useState<string>();
   const [status, setStatus] = useState<string>();
-  const pendingBaselineTraceId = useRef<string>();
+  const pendingBaselineTraceId = useRef<string | undefined>(undefined);
   useEffect(() => {
     void getCsrfAttackerOrigin()
       .then(({ origin }) => {
