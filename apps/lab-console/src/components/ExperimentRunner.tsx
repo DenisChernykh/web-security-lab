@@ -25,6 +25,10 @@ const modeLabels: Record<LabMode, string> = {
   safe: "Защищённая"
 };
 
+function isRunnable(status: ExperimentState["status"]): boolean {
+  return status === "ready" || status === "complete" || status === "stream-incomplete";
+}
+
 export function ExperimentRunner({ labId, scenario, state, dispatch }: ExperimentRunnerProps) {
   useEffect(() => {
     const controller = new AbortController();
@@ -41,7 +45,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
-          dispatch({ type: "RUN_FAILED", error: error instanceof Error ? error.message : "Unknown error" });
+          dispatch({ type: "INITIALIZATION_FAILED", error: error instanceof Error ? error.message : "Unknown error" });
         }
       });
 
@@ -52,7 +56,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
   }, [dispatch, labId]);
 
   const chooseMode = async (mode: LabMode) => {
-    if (state.modeChangePending !== undefined || mode === state.mode) {
+    if (state.status === "running" || state.modeChangePending !== undefined || mode === state.mode) {
       return;
     }
     dispatch({ type: "MODE_CHANGE_STARTED", mode });
@@ -65,7 +69,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
   };
 
   const run = async () => {
-    if (state.modeChangePending !== undefined) {
+    if (!isRunnable(state.status) || state.modeChangePending !== undefined) {
       return;
     }
     dispatch({ type: "RUN_STARTED" });
@@ -90,7 +94,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
             className={`mode-button ${mode === "safe" ? "safe" : ""}`}
             type="button"
             aria-pressed={state.mode === mode}
-            disabled={state.modeChangePending !== undefined}
+            disabled={state.status === "running" || state.modeChangePending !== undefined}
             key={mode}
             onClick={() => void chooseMode(mode)}
           >
@@ -111,7 +115,7 @@ export function ExperimentRunner({ labId, scenario, state, dispatch }: Experimen
         className="run-button"
         type="button"
         onClick={() => void run()}
-        disabled={state.status === "running" || state.modeChangePending !== undefined}
+        disabled={!isRunnable(state.status) || state.modeChangePending !== undefined}
       >
         Запустить локально
       </button>

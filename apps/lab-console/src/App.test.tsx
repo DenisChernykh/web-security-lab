@@ -26,28 +26,44 @@ const sqlSource = {
 };
 
 type ModeBehavior = "success" | "deferred" | "failure";
+type HealthBehavior = "success" | "deferred-failure";
+type ExerciseBehavior = "success" | "deferred";
 
 let modeBehavior: ModeBehavior;
+let healthBehavior: HealthBehavior;
+let exerciseBehavior: ExerciseBehavior;
 let resolveModeRequest: ((response: Response) => void) | undefined;
+let rejectHealthRequest: ((error: Error) => void) | undefined;
 let exerciseRequests: number;
 let exerciseRequestBody: unknown;
+let modeRequests: number;
 
 describe("SQL console", () => {
   beforeEach(() => {
     modeBehavior = "success";
+    healthBehavior = "success";
+    exerciseBehavior = "success";
     resolveModeRequest = undefined;
+    rejectHealthRequest = undefined;
     exerciseRequests = 0;
     exerciseRequestBody = undefined;
+    modeRequests = 0;
     vi.stubGlobal("EventSource", MockEventSource);
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/health")) {
+        if (healthBehavior === "deferred-failure") {
+          return new Promise<Response>((_resolve, reject) => {
+            rejectHealthRequest = reject;
+          });
+        }
         return Response.json({ status: "ok", labId: "sql" });
       }
       if (url.endsWith("/source")) {
         return Response.json(sqlSource);
       }
       if (url.endsWith("/mode")) {
+        modeRequests += 1;
         if (modeBehavior === "deferred") {
           return new Promise<Response>((resolve) => {
             resolveModeRequest = resolve;
@@ -61,6 +77,9 @@ describe("SQL console", () => {
       if (url.endsWith("/exercise/login")) {
         exerciseRequests += 1;
         exerciseRequestBody = JSON.parse(String(init?.body));
+        if (exerciseBehavior === "deferred") {
+          return new Promise<Response>(() => undefined);
+        }
         const event: LabEvent = {
           id: "event-1",
           timestamp: "2026-07-16T00:00:00.000Z",
@@ -101,6 +120,7 @@ describe("SQL console", () => {
     expect(screen.getByRole("heading", { name: "SQL Injection" })).toBeTruthy();
     expect(screen.getByText('{"email":"\' OR 1=1 -- ","password":"[REDACTED]"}')).toBeTruthy();
     expect(screen.queryByText(/"password":"demo"/)).toBeNull();
+    await screen.findByText("Локальная лаборатория готова");
     fireEvent.click(screen.getByRole("button", { name: "Запустить локально" }));
     await screen.findByText("Условие SQL стало истинным для нескольких строк");
     expect(exerciseRequestBody).toEqual({ email: "' OR 1=1 -- ", password: "demo" });
@@ -144,5 +164,38 @@ describe("SQL console", () => {
     await screen.findByText("mode unavailable");
     expect(vulnerableButton.getAttribute("aria-pressed")).toBe("true");
     expect(safeButton.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("does not allow a mode switch after an exercise starts", async () => {
+    exerciseBehavior = "deferred";
+    render(<App />);
+
+    await screen.findByText("Локальная лаборатория готова");
+    const runButton = screen.getByRole("button", { name: "Запустить локально" });
+    const safeButton = screen.getByRole("button", { name: "Защищённая" }) as HTMLButtonElement;
+    fireEvent.click(runButton);
+
+    await screen.findByText("Выполняем фиксированный учебный запрос");
+    expect(safeButton.disabled).toBe(true);
+    fireEvent.click(safeButton);
+    expect(modeRequests).toBe(0);
+    expect(safeButton.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("keeps execution unavailable until a delayed health check rejects", async () => {
+    healthBehavior = "deferred-failure";
+    render(<App />);
+
+    const runButton = screen.getByRole("button", { name: "Запустить локально" }) as HTMLButtonElement;
+    expect(runButton.disabled).toBe(true);
+    fireEvent.click(runButton);
+    expect(exerciseRequests).toBe(0);
+
+    await act(async () => {
+      rejectHealthRequest?.(new Error("health unavailable"));
+    });
+
+    await screen.findByText("health unavailable");
+    expect(runButton.disabled).toBe(true);
   });
 });

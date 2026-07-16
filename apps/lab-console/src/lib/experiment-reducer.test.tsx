@@ -3,8 +3,51 @@ import { describe, expect, it } from "vitest";
 import { experimentReducer, initialExperimentState } from "./experiment-reducer.js";
 
 describe("experimentReducer", () => {
+  it("does not let a delayed initialization failure replace an active experiment", () => {
+    const ready = experimentReducer(initialExperimentState, { type: "HEALTH_READY" });
+    const running = experimentReducer(ready, { type: "RUN_STARTED" });
+
+    expect(experimentReducer(running, {
+      type: "INITIALIZATION_FAILED",
+      error: "health unavailable"
+    })).toEqual(running);
+  });
+
+  it("ignores mode transitions while an experiment is running", () => {
+    const ready = experimentReducer(initialExperimentState, { type: "HEALTH_READY" });
+    const running = experimentReducer(ready, { type: "RUN_STARTED" });
+
+    expect(experimentReducer(running, { type: "MODE_CHANGE_STARTED", mode: "safe" })).toEqual(running);
+    expect(experimentReducer(running, { type: "MODE_CHANGED", mode: "safe" })).toEqual(running);
+    expect(experimentReducer(running, {
+      type: "MODE_CHANGE_FAILED",
+      error: "mode unavailable"
+    })).toEqual(running);
+  });
+
+  it("keeps a completed result truthful when a later mode request fails", () => {
+    const ready = experimentReducer(initialExperimentState, { type: "HEALTH_READY" });
+    const running = experimentReducer(ready, { type: "RUN_STARTED" });
+    const complete = experimentReducer(running, {
+      type: "RUN_SUCCEEDED",
+      result: { traceId: "trace-1", outcome: "exploited", status: 200, body: { authenticated: true } }
+    });
+    const pendingModeChange = experimentReducer(complete, { type: "MODE_CHANGE_STARTED", mode: "safe" });
+
+    expect(experimentReducer(pendingModeChange, {
+      type: "MODE_CHANGE_FAILED",
+      error: "mode unavailable"
+    })).toMatchObject({
+      status: "complete",
+      mode: "vulnerable",
+      result: { traceId: "trace-1", outcome: "exploited" },
+      error: "mode unavailable"
+    });
+  });
+
   it("keeps a running experiment running when delayed health checking completes", () => {
-    const running = experimentReducer(initialExperimentState, { type: "RUN_STARTED" });
+    const ready = experimentReducer(initialExperimentState, { type: "HEALTH_READY" });
+    const running = experimentReducer(ready, { type: "RUN_STARTED" });
 
     expect(experimentReducer(running, { type: "HEALTH_READY" }).status).toBe("running");
   });
@@ -18,7 +61,7 @@ describe("experimentReducer", () => {
     const stale = { ...matching, id: "stale", traceId: "trace-0" };
     const withEvents = [matching, stale].reduce(
       (state, event) => experimentReducer(state, { type: "RUN_EVENT", event }),
-      experimentReducer(initialExperimentState, { type: "RUN_STARTED" })
+      experimentReducer(experimentReducer(initialExperimentState, { type: "HEALTH_READY" }), { type: "RUN_STARTED" })
     );
 
     expect(experimentReducer(withEvents, {
