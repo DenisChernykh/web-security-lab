@@ -4,3 +4,11 @@ node_modules/
 apps/lab-console/dist/
 playwright-report/
 test-results/
+.DS_Store
+.pnpm-store/
+.env
+.env.local
+.env.production
+.dev.vars
+*.log
+!*.example
